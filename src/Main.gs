@@ -210,7 +210,8 @@ function notificationFor_(it) {
     fromName: it.fromName || it.fromEmail,
     summary: d.summary || it.subject,
     deadline: d.deadline || '',
-    category: it.mandatory ? 'processo_seletivo' : (d.category || 'outro')
+    category: it.mandatory ? 'processo_seletivo' : (d.category || 'outro'),
+    threadId: it.threadId
   };
 }
 

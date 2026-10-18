@@ -26,6 +26,7 @@ var CATEGORY_LABEL = {
 
 /** Envia um aviso de e-mail. n = { fromName, summary, deadline, category } */
 function notifyWhatsApp_(n) {
+  if (isNtfy_()) return ntfyNotify_(n);
   if (isFreeTextProvider_()) return sendFreeText_(formatNotificationText_(n));
   if (isServiceWindowOpen_()) {
     var res = waSendText_(formatNotificationText_(n));
@@ -119,11 +120,13 @@ function isGreenApi_() {
 /** Provedores sem template nem janela de 24h. */
 function isFreeTextProvider_() {
   var p = cfg('WA_PROVIDER');
-  return p === 'greenapi' || p === 'textmebot';
+  return p === 'greenapi' || p === 'textmebot' || p === 'ntfy';
 }
 
 function sendFreeText_(text) {
-  return cfg('WA_PROVIDER') === 'textmebot' ? textMeBotSend_(text) : greenSendText_(text);
+  var p = cfg('WA_PROVIDER');
+  if (p === 'ntfy') return ntfyText_(text);
+  return p === 'textmebot' ? textMeBotSend_(text) : greenSendText_(text);
 }
 
 /** TextMeBot: GET https://api.textmebot.com/send.php?recipient=+55...&apikey=...&text=... */

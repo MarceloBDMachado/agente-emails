@@ -256,3 +256,38 @@ test('provedor TextMeBot: erro no corpo vira falha e cai no e-mail', () => {
   assert.equal(c.__calls.emails.length, 1);
   assert.match(c.__calls.emails[0].body, /TextMeBot/);
 });
+
+test('canal ntfy: JSON na raiz com topico, titulo = resumo, prioridade e link do Gmail', () => {
+  const c = scenario({ MODE: 'shadow', WA_PROVIDER: 'ntfy', NTFY_TOPIC: 'agente-xyz' }, goodGroq);
+  const calls = [];
+  c.UrlFetchApp.fetch = (url, params) => {
+    calls.push({ url, body: JSON.parse(params.payload) });
+    const r = url.includes('groq.com') ? goodGroq(JSON.parse(params.payload)) : { code: 200, body: '{"id":"abc"}' };
+    return { getResponseCode: () => r.code, getContentText: () => r.body };
+  };
+  c.runAgentOnce_({});
+  const n = calls.filter((x) => x.url === 'https://ntfy.sh');
+  assert.equal(n.length, 1);
+  assert.equal(n[0].body.topic, 'agente-xyz');
+  assert.equal(n[0].body.title, 'PwC: teste online liberado');
+  assert.match(n[0].body.message, /De: JobConvo\nPrazo: 28\/10/);
+  assert.equal(n[0].body.priority, 4);
+  assert.deepEqual(n[0].body.tags, ['briefcase']);
+  assert.equal(n[0].body.click, 'https://mail.google.com/mail/u/0/#inbox/th2');
+  assert.deepEqual([...c.requiredProps_()], ['NTFY_TOPIC', 'GROQ_API_KEY']);
+});
+
+test('canal ntfy: 429 tenta de novo uma vez; texto livre sem asteriscos', () => {
+  const c = load({ props: Object.assign({}, BASE_PROPS, { WA_PROVIDER: 'ntfy', NTFY_TOPIC: 't' }) });
+  let n = 0;
+  const bodies = [];
+  c.UrlFetchApp.fetch = (url, params) => {
+    n++; bodies.push(JSON.parse(params.payload));
+    const code = n === 1 ? 429 : 200;
+    return { getResponseCode: () => code, getContentText: () => '{}' };
+  };
+  const res = c.waSendText_('☀️ *Resumo*\nok');
+  assert.equal(res.ok, true);
+  assert.equal(n, 2);
+  assert.equal(bodies[0].message, '☀️ Resumo\nok');
+});

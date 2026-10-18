@@ -13,12 +13,14 @@ function requiredProps_() {
   var p = cfg('WA_PROVIDER');
   if (p === 'greenapi') return ['GREEN_API_URL', 'GREEN_ID_INSTANCE', 'GREEN_API_TOKEN', 'WA_TO', 'GROQ_API_KEY'];
   if (p === 'textmebot') return ['TEXTMEBOT_API_KEY', 'WA_TO', 'GROQ_API_KEY'];
+  if (p === 'ntfy') return ['NTFY_TOPIC', 'GROQ_API_KEY'];
   return ['WA_TOKEN', 'WA_PHONE_NUMBER_ID', 'WA_TO', 'GROQ_API_KEY', 'WEBHOOK_VERIFY_TOKEN'];
 }
 
 function setup() {
-  requiredProps_().forEach(requireCfg);
-  if (!/^\d{10,15}$/.test(cfg('WA_TO'))) throw new Error('WA_TO deve ter so digitos com DDI, ex.: 5521999998888');
+  var required = requiredProps_();
+  required.forEach(requireCfg);
+  if (required.indexOf('WA_TO') >= 0 && !/^\d{10,15}$/.test(cfg('WA_TO'))) throw new Error('WA_TO deve ter so digitos com DDI, ex.: 5521999998888');
 
   var every = Number(cfg('RUN_EVERY_MINUTES'));
   if ([1, 5, 10, 15, 30].indexOf(every) < 0) throw new Error('RUN_EVERY_MINUTES deve ser 1, 5, 10, 15 ou 30');
@@ -42,9 +44,11 @@ function uninstall() {
 }
 
 function testWhatsApp() {
-  var res = waSendTemplate_(['Agente de Emails', 'Mensagem de teste: se chegou, o WhatsApp esta funcionando', 'nao informado']);
+  var res = isNtfy_()
+    ? ntfyNotify_({ fromName: 'Agente de Emails', summary: 'Mensagem de teste: se chegou, as notificacoes estao funcionando', deadline: '', category: 'outro' })
+    : waSendTemplate_(['Agente de Emails', 'Mensagem de teste: se chegou, o WhatsApp esta funcionando', 'nao informado']);
   console.log(JSON.stringify(res));
-  console.log('"ok" = a Meta aceitou. Se nao chegar no celular, rode showStatus() em 1 minuto para ver o erro de entrega.');
+  console.log('"ok" = o servico aceitou. Na Meta, se nao chegar no celular, rode showStatus() em 1 minuto para ver o erro de entrega.');
 }
 
 function testGroq() {

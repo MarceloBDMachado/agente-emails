@@ -90,7 +90,7 @@ function load(opts) {
       getScriptTimeZone: () => 'America/Sao_Paulo',
       getEffectiveUser: () => ({ getEmail: () => 'marcelo@example.com' })
     },
-    Utilities: { formatDate: (d) => new Date(d).toISOString().slice(0, 16).replace('T', ' ') },
+    Utilities: { formatDate: (d) => new Date(d).toISOString().slice(0, 16).replace('T', ' '), sleep: () => {} },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     ContentService: { createTextOutput: (t) => ({ text: t }) },
     ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: () => ({}) },
