@@ -113,7 +113,7 @@ function classifyItems_(items) {
   return out;
 }
 
-function classifyBatch_(batch) {
+function classifyBatch_(batch, isRetry) {
   var tz = Session.getScriptTimeZone();
   var payloadItems = batch.map(function (it) {
     var hints = [];
@@ -131,7 +131,8 @@ function classifyBatch_(batch) {
     };
   });
   var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd (EEEE) HH:mm");
-  var userMsg = 'Hoje: ' + today + '\nE-mails (JSON):\n' + JSON.stringify(payloadItems);
+  var userMsg = 'Hoje: ' + today + '. Responda com exatamente ' + batch.length + ' decisoes, uma para cada id, ' +
+    'inclusive as de notify=false.\nE-mails (JSON):\n' + JSON.stringify(payloadItems);
   var ids = batch.map(function (it) { return it.id; });
 
   var models = [cfg('GROQ_MODEL'), cfg('GROQ_FALLBACK_MODEL')];
@@ -142,7 +143,15 @@ function classifyBatch_(batch) {
     }
     if (res.ok) {
       var parsed = parseLlmDecisions_(res.content, ids);
-      if (parsed) return parsed;
+      if (parsed) {
+        // a IA as vezes devolve so os que avisam; pergunta de novo, uma vez, pelos que faltaram
+        var missing = batch.filter(function (it) { return !parsed[it.id]; });
+        if (missing.length && !isRetry) {
+          var more = classifyBatch_(missing, true) || {};
+          for (var k in more) parsed[k] = more[k];
+        }
+        return parsed;
+      }
       console.warn('Resposta da IA invalida (' + models[m] + '): ' + String(res.content).slice(0, 300));
     } else {
       console.warn('Falha no Groq (' + models[m] + '): HTTP ' + res.status + ' ' + String(res.text).slice(0, 300));

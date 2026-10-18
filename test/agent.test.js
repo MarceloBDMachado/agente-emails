@@ -409,3 +409,23 @@ test('canal gmail: aviso vira mensagem nova com marcador Avisos, fora da caixa d
   c.dailyDigest();
   assert.deepEqual(imports[2].labelIds, ['UNREAD', 'INBOX']);
 });
+
+test('IA devolveu so parte dos ids: pergunta de novo uma vez pelos que faltaram', () => {
+  const asked = [];
+  const c = load({
+    props: { GROQ_API_KEY: 'k' },
+    fetch: (url, params) => {
+      const req = JSON.parse(params.payload);
+      const items = JSON.parse(req.messages[1].content.split('\n').slice(2).join('\n'));
+      asked.push(items.map((i) => i.id));
+      const only = asked.length === 1 ? items.slice(0, 1) : items; // 1a resposta incompleta
+      const decisions = only.map((i) => ({ id: i.id, notify: false, category: 'academico', summary: 's', deadline: '', reason: 'r' }));
+      return { code: 200, body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ decisions }) } }] }) };
+    }
+  });
+  const mk = (id) => ({ id, fromName: 'X', fromEmail: 'x@x.com', subject: 's', snippet: '', date: new Date() });
+  const out = c.classifyBatch_([mk('a'), mk('b'), mk('c')]);
+  assert.deepEqual(Object.keys(out).sort(), ['a', 'b', 'c']);
+  assert.deepEqual(asked, [['a', 'b', 'c'], ['b', 'c']]);
+  assert.match(c.__calls.fetch[0].body.messages[1].content, /exatamente 3 decisoes/);
+});
