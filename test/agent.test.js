@@ -295,9 +295,11 @@ test('canal ntfy: 429 tenta de novo uma vez; texto livre sem asteriscos', () => 
 test('listas pessoais: prioritario sempre vai pra IA com dica; silenciado e descartado', () => {
   const c = load({ props: { PRIORITY_SENDERS: 'autosau@puc-rio.br, orientadora.com', MUTED_SENDERS: 'catho.com.br;jira@lab.atlassian.net' } });
   const r = (o) => c.applyRules_(Object.assign({ fromName: '', fromEmail: '', subject: '', labels: [], category: '' }, o));
-  const p = r({ fromEmail: 'autosau@puc-rio.br', subject: 'Seu código de verificação', category: 'promotions' });
-  assert.equal(p.action, 'llm');
+  const p = r({ fromEmail: 'autosau@puc-rio.br', subject: 'Aula cancelada', category: 'promotions' });
+  assert.equal(p.action, 'llm'); // aba Promocoes nao corta remetente prioritario
   assert.equal(p.priority, true);
+  // ruido certo continua cortado, mesmo de remetente prioritario
+  assert.equal(r({ fromEmail: 'autosau@puc-rio.br', subject: 'Chave de ativação para cadastro/alteração de senha do sistema SAU' }).action, 'discard');
   assert.equal(r({ fromEmail: 'ana@mail.orientadora.com', subject: 'x' }).priority, true); // dominio e subdominio
   assert.equal(r({ fromEmail: 'outro@puc-rio.br', subject: 'x' }).priority, undefined);
   assert.equal(r({ fromEmail: 'avisovagas@catho.com.br', subject: 'Trabalhe em Rio de Janeiro: 1 nova vaga' }).rule, 'Remetente silenciado');

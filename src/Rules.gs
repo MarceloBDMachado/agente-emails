@@ -33,7 +33,7 @@ var DISCARD_RULES = [
   { name: 'Confirmacao de login', subject: /(novo (acesso|login|dispositivo)|new (sign-?in|login|device)|sign-?in (alert|attempt|detected)|login (detectado|realizado|confirm)|acesso (detectado|realizado) [àa] sua conta|someone signed in|voc[eê] (fez|acabou de fazer) login)/i },
   { name: 'Login com Google em outro site', subject: /(compartilhou alguns dados da sua conta do google|shared some of your google account data)/i },
   { name: 'Sugestao de vagas', subject: /(vagas? do dia|sugest[aã]o de vagas?|job alert|novas vagas para)/i },
-  { name: 'Codigo de verificacao', subject: /(c[oó]digo de (verifica[cç][aã]o|acesso|seguran[cç]a|confirma[cç][aã]o)|verification code|security code|one-time (code|password|passcode)|\bOTP\b|seu c[oó]digo|your code)/i }
+  { name: 'Codigo de verificacao', subject: /(c[oó]digo de (verifica[cç][aã]o|acesso|seguran[cç]a|confirma[cç][aã]o)|chave de ativa[cç][aã]o|verification code|security code|one-time (code|password|passcode)|\bOTP\b|seu c[oó]digo|your code)/i }
 ];
 
 /**
@@ -42,8 +42,8 @@ var DISCARD_RULES = [
  * propriedade do script com os itens separados por virgula. Item = endereco
  * completo ("prof@puc-rio.br") ou dominio inteiro ("catho.com.br").
  *
- *   PRIORITY_SENDERS / LISTA_PRIORITARIA  sempre passam pela IA (nem regra de descarte
- *       nem aba Promocoes os cortam) e vao com a dica de remetente importante.
+ *   PRIORITY_SENDERS / LISTA_PRIORITARIA  passam pela IA mesmo na aba Promocoes e vao com a
+ *       dica de remetente importante (so o ruido certo, como codigo de verificacao, e cortado).
  *       Quem decide se avisa continua sendo o conteudo.
  *   MUTED_SENDERS / LISTA_SILENCIADA      descartados direto, sem gastar IA.
  */
@@ -92,9 +92,6 @@ function applyRules_(item) {
     return { action: 'mandatory', rule: hasJobLabel ? 'Marcador "' + jobLabel + '"' : 'Plataforma de recrutamento (' + jobDomain + ')' };
   }
 
-  if (senderInList_(item.fromEmail, prioritySenders_())) {
-    return { action: 'llm', rule: 'Remetente prioritario', priority: true };
-  }
   if (senderInList_(item.fromEmail, mutedSenders_())) {
     return { action: 'discard', rule: 'Remetente silenciado' };
   }
@@ -107,6 +104,10 @@ function applyRules_(item) {
     if (ok && r.any && !(r.any.test(fromText) || r.any.test(item.subject || ''))) ok = false;
     if (ok && r.subject && !r.subject.test(item.subject || '')) ok = false;
     if (ok) return { action: 'discard', rule: r.name };
+  }
+
+  if (senderInList_(item.fromEmail, prioritySenders_())) {
+    return { action: 'llm', rule: 'Remetente prioritario', priority: true };
   }
 
   if (item.category === 'promotions' || item.category === 'social' || item.category === 'forums') {

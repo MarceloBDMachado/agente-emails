@@ -65,7 +65,8 @@ var SYSTEM_PROMPT = [
   '- Confirmacao de login, codigo de verificacao, aviso de novo acesso de rotina, recibos e confirmacoes automaticas.',
   '- Codigo, chave ou link de ativacao/redefinicao de senha que ele mesmo pediu; confirmacao de envio de tarefa;',
   '  conclusao de um pedido dele que nao tem prazo (ex.: historico escolar emitido).',
-  '- Monitoria, plantao de duvidas, revisao ou vista de prova: nunca, nem quando remarcada ou cancelada.',
+  '- Revisao de prova, vista de prova, monitoria, plantao ou reuniao de duvidas: NUNCA, nem quando marcada, remarcada,',
+  '  cancelada ou com sala nova. Revisao/vista de prova nao e prova.',
   '- Mensagens so informativas ou que podem esperar, mesmo de quem ele conhece.',
   'A dica "remetente prioritario" indica alguem que importa, mas o conteudo decide: aviso irrelevante dele continua notify=false.',
   'Na duvida: notifique so se perder o e-mail por um dia puder causar prejuizo real (prazo, oportunidade, nota, compromisso).',
@@ -173,7 +174,8 @@ function callGroq_(model, userMsg, strictSchema) {
     response_format: strictSchema
       ? { type: 'json_schema', json_schema: { name: 'email_decisions', strict: true, schema: DECISION_SCHEMA } }
       : { type: 'json_object' },
-    max_completion_tokens: LLM_MAX_TOKENS
+    max_completion_tokens: LLM_MAX_TOKENS,
+    temperature: 0.2 // decisoes consistentes: o mesmo tipo de e-mail deve dar o mesmo resultado
   };
   if (/gpt-oss/.test(model)) {
     body.reasoning_effort = cfg('GROQ_REASONING_EFFORT');
