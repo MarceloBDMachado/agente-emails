@@ -47,7 +47,9 @@ function uninstall() {
 }
 
 function testWhatsApp() {
-  var test = { fromName: 'Agente de Emails', summary: 'Mensagem de teste: se tocou, as notificacoes estao funcionando', deadline: '', category: 'outro' };
+  // horario no assunto: o Gmail agrupa mensagens de mesmo assunto numa conversa so
+  var hhmm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
+  var test = { fromName: 'Agente de Emails', summary: 'Teste das ' + hhmm + ': se tocou, as notificacoes estao funcionando', deadline: '', category: 'outro' };
   var res = isGmailChannel_() ? gmailNotify_(test)
     : isNtfy_() ? ntfyNotify_(test)
     : waSendTemplate_(['Agente de Emails', 'Mensagem de teste: se chegou, o WhatsApp esta funcionando', 'nao informado']);
