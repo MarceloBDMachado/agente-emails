@@ -227,3 +227,32 @@ test('provedor Green API: texto livre para numero@c.us, sem template', () => {
   assert.equal(green[0].body.chatId, '5521999998888@c.us');
   assert.match(green[0].body.message, /PwC: teste online liberado/);
 });
+
+test('provedor TextMeBot: GET com recipient, apikey e texto codificados', () => {
+  const c = scenario({ MODE: 'shadow', WA_PROVIDER: 'textmebot', TEXTMEBOT_API_KEY: 'k3y' }, goodGroq);
+  const calls = [];
+  c.UrlFetchApp.fetch = (url, params) => {
+    calls.push(url);
+    const r = url.includes('groq.com') ? goodGroq(JSON.parse(params.payload)) : { code: 200, body: 'Success! Message sent' };
+    return { getResponseCode: () => r.code, getContentText: () => r.body };
+  };
+  c.runAgentOnce_({});
+  const tmb = calls.filter((u) => u.includes('textmebot.com'));
+  assert.equal(tmb.length, 1);
+  const u = new URL(tmb[0]);
+  assert.equal(u.searchParams.get('recipient'), '+5521999998888');
+  assert.equal(u.searchParams.get('apikey'), 'k3y');
+  assert.match(u.searchParams.get('text'), /PwC: teste online liberado/);
+  assert.deepEqual([...c.requiredProps_()], ['TEXTMEBOT_API_KEY', 'WA_TO', 'GROQ_API_KEY']);
+});
+
+test('provedor TextMeBot: erro no corpo vira falha e cai no e-mail', () => {
+  const c = scenario({ MODE: 'shadow', WA_PROVIDER: 'textmebot', TEXTMEBOT_API_KEY: 'k3y' }, goodGroq);
+  c.UrlFetchApp.fetch = (url, params) => {
+    const r = url.includes('groq.com') ? goodGroq(JSON.parse(params.payload)) : { code: 200, body: 'Error: WhatsApp not linked' };
+    return { getResponseCode: () => r.code, getContentText: () => r.body };
+  };
+  c.runAgentOnce_({});
+  assert.equal(c.__calls.emails.length, 1);
+  assert.match(c.__calls.emails[0].body, /TextMeBot/);
+});

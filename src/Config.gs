@@ -14,6 +14,7 @@
  *
  * Se usar a Green API (WA_PROVIDER=greenapi), troque WA_TOKEN/WA_PHONE_NUMBER_ID/
  * WEBHOOK_VERIFY_TOKEN por GREEN_API_URL, GREEN_ID_INSTANCE e GREEN_API_TOKEN.
+ * Se usar o TextMeBot (WA_PROVIDER=textmebot), basta TEXTMEBOT_API_KEY.
  *
  * Opcionais (tem valor padrao abaixo): MODE, GROQ_MODEL, WA_TEMPLATE, ALERT_EMAIL...
  */
@@ -22,7 +23,7 @@ var DEFAULTS = {
   // 'shadow': a IA so registra na planilha o que mandaria (regras fixas continuam avisando).
   // 'live'  : a IA tambem manda WhatsApp.
   MODE: 'shadow',
-  WA_PROVIDER: 'meta',          // 'meta' (Cloud API oficial) ou 'greenapi' (veja o README)
+  WA_PROVIDER: 'meta',          // 'meta' (Cloud API oficial), 'greenapi' ou 'textmebot' (veja o README)
   GROQ_MODEL: 'openai/gpt-oss-120b',
   GROQ_FALLBACK_MODEL: 'openai/gpt-oss-20b',
   GROQ_REASONING_EFFORT: 'medium',

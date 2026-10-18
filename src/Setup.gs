@@ -10,9 +10,10 @@
  */
 
 function requiredProps_() {
-  return cfg('WA_PROVIDER') === 'greenapi'
-    ? ['GREEN_API_URL', 'GREEN_ID_INSTANCE', 'GREEN_API_TOKEN', 'WA_TO', 'GROQ_API_KEY']
-    : ['WA_TOKEN', 'WA_PHONE_NUMBER_ID', 'WA_TO', 'GROQ_API_KEY', 'WEBHOOK_VERIFY_TOKEN'];
+  var p = cfg('WA_PROVIDER');
+  if (p === 'greenapi') return ['GREEN_API_URL', 'GREEN_ID_INSTANCE', 'GREEN_API_TOKEN', 'WA_TO', 'GROQ_API_KEY'];
+  if (p === 'textmebot') return ['TEXTMEBOT_API_KEY', 'WA_TO', 'GROQ_API_KEY'];
+  return ['WA_TOKEN', 'WA_PHONE_NUMBER_ID', 'WA_TO', 'GROQ_API_KEY', 'WEBHOOK_VERIFY_TOKEN'];
 }
 
 function setup() {

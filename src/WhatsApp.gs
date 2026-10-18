@@ -8,6 +8,9 @@
  *
  * 'greenapi': Green API (nao oficial), plano Developer gratuito. Usa um segundo numero
  *   de WhatsApp conectado por QR code e manda texto livre sempre. Veja o README.
+ *
+ * 'textmebot': TextMeBot (nao oficial, pago, ~US$ 1/mes para 1 destinatario). Conecta a
+ *   SUA conta de WhatsApp e manda texto livre sempre.
  */
 
 var CATEGORY_LABEL = {
@@ -23,7 +26,7 @@ var CATEGORY_LABEL = {
 
 /** Envia um aviso de e-mail. n = { fromName, summary, deadline, category } */
 function notifyWhatsApp_(n) {
-  if (isGreenApi_()) return greenSendText_(formatNotificationText_(n));
+  if (isFreeTextProvider_()) return sendFreeText_(formatNotificationText_(n));
   if (isServiceWindowOpen_()) {
     var res = waSendText_(formatNotificationText_(n));
     if (res.ok) return res;
@@ -41,7 +44,7 @@ function formatNotificationText_(n) {
 
 /** A janela de atendimento esta aberta? (ultima mensagem recebida do usuario ha menos de 23h30) */
 function isServiceWindowOpen_() {
-  if (isGreenApi_()) return true; // sem janela: texto livre sempre
+  if (isFreeTextProvider_()) return true; // sem janela: texto livre sempre
   var last = Number(cfg('LAST_INBOUND_TS') || 0);
   return last > 0 && Date.now() - last < 23.5 * 3600 * 1000;
 }
@@ -65,15 +68,15 @@ function buildTemplatePayload_(to, templateName, lang, params) {
 }
 
 function waSendTemplate_(params) {
-  if (isGreenApi_()) {
-    return greenSendText_('📬 *' + oneLine_(params[1], 300) + '*\nDe: ' + oneLine_(params[0], 80) +
+  if (isFreeTextProvider_()) {
+    return sendFreeText_('📬 *' + oneLine_(params[1], 300) + '*\nDe: ' + oneLine_(params[0], 80) +
       (params[2] && params[2] !== 'nao informado' ? '\nPrazo: ' + oneLine_(params[2], 60) : ''));
   }
   return waPost_(buildTemplatePayload_(requireCfg('WA_TO'), cfg('WA_TEMPLATE'), cfg('WA_TEMPLATE_LANG'), params));
 }
 
 function waSendText_(text) {
-  if (isGreenApi_()) return greenSendText_(text);
+  if (isFreeTextProvider_()) return sendFreeText_(text);
   return waPost_({
     messaging_product: 'whatsapp',
     to: requireCfg('WA_TO'),
@@ -111,6 +114,34 @@ function waPost_(body) {
 
 function isGreenApi_() {
   return cfg('WA_PROVIDER') === 'greenapi';
+}
+
+/** Provedores sem template nem janela de 24h. */
+function isFreeTextProvider_() {
+  var p = cfg('WA_PROVIDER');
+  return p === 'greenapi' || p === 'textmebot';
+}
+
+function sendFreeText_(text) {
+  return cfg('WA_PROVIDER') === 'textmebot' ? textMeBotSend_(text) : greenSendText_(text);
+}
+
+/** TextMeBot: GET https://api.textmebot.com/send.php?recipient=+55...&apikey=...&text=... */
+function textMeBotSend_(text) {
+  var url = 'https://api.textmebot.com/send.php' +
+    '?recipient=' + encodeURIComponent('+' + requireCfg('WA_TO')) +
+    '&apikey=' + encodeURIComponent(requireCfg('TEXTMEBOT_API_KEY')) +
+    '&text=' + encodeURIComponent(String(text).slice(0, 3000));
+  try {
+    var resp = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+    var body = String(resp.getContentText() || '');
+    if (resp.getResponseCode() === 200 && !/error|invalid|not (found|linked|connected)|fail/i.test(body)) {
+      return { ok: true, id: 'textmebot' };
+    }
+    return { ok: false, error: 'TextMeBot HTTP ' + resp.getResponseCode() + ' ' + body.replace(/<[^>]+>/g, ' ').slice(0, 200) };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
 }
 
 /** Green API: POST {apiUrl}/waInstance{id}/sendMessage/{token} com { chatId, message }. */
