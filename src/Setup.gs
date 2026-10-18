@@ -210,3 +210,23 @@ function simulateSenders() {
     (left ? 'Faltam ' + left + ': rode de novo.' : 'Concluido.') + ' Aba "' + sheetName + '": ' + getLogSpreadsheet_().getUrl());
   lines.forEach(function (l) { console.log(l); });
 }
+
+/**
+ * Diagnostico do canal Gmail: manda tres testes de uma vez, cada um entregue de um jeito,
+ * para descobrir qual faz o celular tocar.
+ *   A: mensagem importada so no marcador Avisos (o jeito atual)
+ *   B: mensagem importada na caixa de entrada + Avisos
+ *   C: e-mail normal (SMTP) de voce para voce mesmo
+ */
+function testGmailDelivery() {
+  var hhmm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
+  var body = 'Teste de entrega do Agente de Emails. Diga qual das letras (A, B, C) tocou no celular.';
+  var label = cfg('LABEL_ALERTS');
+  var a = gmailImport_({ fromName: 'Agente de Emails', subject: 'Teste A ' + hhmm + ' (so Avisos)', body: body, labels: [label], inbox: false });
+  var b = gmailImport_({ fromName: 'Agente de Emails', subject: 'Teste B ' + hhmm + ' (caixa de entrada + Avisos)', body: body, labels: [label], inbox: true });
+  var c = 'ok';
+  try {
+    GmailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Teste C ' + hhmm + ' (e-mail normal para voce mesmo)', body, { name: 'Agente de Emails' });
+  } catch (e) { c = String(e); }
+  console.log(JSON.stringify({ A: a, B: b, C: c }));
+}
