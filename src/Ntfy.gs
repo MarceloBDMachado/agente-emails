@@ -8,7 +8,9 @@
  * Quem souber o nome do topico consegue ler as mensagens: use um nome longo e aleatorio.
  */
 
-var NTFY_PRIORITY = { processo_seletivo: 4, nota: 4, seguranca: 4, academico: 3, pessoal: 3, financeiro: 3, outro: 3, ruido: 2 };
+// O agente so avisa o que importa, entao tudo sai com prioridade alta (som + pop-up no Android).
+// Processo seletivo sai como urgente (vibracao longa).
+var NTFY_PRIORITY = { processo_seletivo: 5, nota: 4, seguranca: 4, academico: 4, pessoal: 4, financeiro: 4, outro: 4, ruido: 3 };
 var NTFY_TAG = {
   processo_seletivo: 'briefcase', nota: 'memo', academico: 'mortar_board', pessoal: 'bust_in_silhouette',
   financeiro: 'credit_card', seguranca: 'lock', outro: 'email', ruido: 'email'

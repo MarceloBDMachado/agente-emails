@@ -271,7 +271,7 @@ test('canal ntfy: JSON na raiz com topico, titulo = resumo, prioridade e link do
   assert.equal(n[0].body.topic, 'agente-xyz');
   assert.equal(n[0].body.title, 'PwC: teste online liberado');
   assert.match(n[0].body.message, /De: JobConvo\nPrazo: 28\/10/);
-  assert.equal(n[0].body.priority, 4);
+  assert.equal(n[0].body.priority, 5);
   assert.deepEqual(n[0].body.tags, ['briefcase']);
   assert.equal(n[0].body.click, 'https://mail.google.com/mail/u/0/#inbox/th2');
   assert.deepEqual([...c.requiredProps_()], ['NTFY_TOPIC', 'GROQ_API_KEY']);
