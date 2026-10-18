@@ -1,0 +1,10 @@
+{
+  "name": "agente-emails",
+  "version": "1.0.0",
+  "description": "Agente de triagem de e-mails: Gmail -> regras + IA (Groq) -> WhatsApp, rodando no Google Apps Script",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}

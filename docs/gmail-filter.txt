@@ -1,0 +1,13 @@
+Filtro do Gmail (rede de seguranca para processos seletivos)
+============================================================
+Gmail > Configuracoes > Filtros e enderecos bloqueados > Criar novo filtro
+Cole a consulta abaixo no campo "Contem as palavras" (ou em "Pesquisar"), clique em
+"Criar filtro" e marque: Aplicar marcador "Processos seletivos", Nunca enviar para spam,
+Sempre marcar como importante.
+
+Modelo de consulta (troque empresa-a/empresa-b pelas empresas dos seus processos):
+
+(from:(gupy.com.br OR gupy.io OR eureca.me OR jobconvo.com OR myworkday.com OR myworkdayjobs.com OR pandape.com.br OR empresa-a.com.br OR empresa-b.com) OR subject:("processo seletivo" OR entrevista OR "dinâmica" OR "teste online" OR "avaliação online")) -from:(catho.com.br OR linkedin.com)
+
+Por que existe: mesmo que o agente pare, o Gmail continua marcando esses e-mails como
+importantes, e o agente trata tudo com esse marcador como "sempre avisar".
