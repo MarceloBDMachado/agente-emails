@@ -16,6 +16,7 @@ function requiredProps_() {
   if (p === 'greenapi') return ['GREEN_API_URL', 'GREEN_ID_INSTANCE', 'GREEN_API_TOKEN', 'WA_TO', 'GROQ_API_KEY'];
   if (p === 'textmebot') return ['TEXTMEBOT_API_KEY', 'WA_TO', 'GROQ_API_KEY'];
   if (p === 'ntfy') return ['NTFY_TOPIC', 'GROQ_API_KEY'];
+  if (p === 'gmail') return ['GROQ_API_KEY'];
   return ['WA_TOKEN', 'WA_PHONE_NUMBER_ID', 'WA_TO', 'GROQ_API_KEY', 'WEBHOOK_VERIFY_TOKEN'];
 }
 
@@ -46,8 +47,9 @@ function uninstall() {
 }
 
 function testWhatsApp() {
-  var res = isNtfy_()
-    ? ntfyNotify_({ fromName: 'Agente de Emails', summary: 'Mensagem de teste: se chegou, as notificacoes estao funcionando', deadline: '', category: 'outro' })
+  var test = { fromName: 'Agente de Emails', summary: 'Mensagem de teste: se tocou, as notificacoes estao funcionando', deadline: '', category: 'outro' };
+  var res = isGmailChannel_() ? gmailNotify_(test)
+    : isNtfy_() ? ntfyNotify_(test)
     : waSendTemplate_(['Agente de Emails', 'Mensagem de teste: se chegou, o WhatsApp esta funcionando', 'nao informado']);
   console.log(JSON.stringify(res));
   console.log('"ok" = o servico aceitou. Na Meta, se nao chegar no celular, rode showStatus() em 1 minuto para ver o erro de entrega.');
@@ -141,7 +143,8 @@ function senderReport() {
  * Se o tempo acabar, rode de novo: continua de onde parou. Para refazer do zero, apague a aba.
  */
 function simulateSenders() {
-  var started = Date.now(), days = 120, perSender = 40, budgetMs = 4.5 * 60 * 1000;
+  // um lote pode levar ~1,5 min se o Groq pedir para esperar; o Apps Script corta em 6 min
+  var started = Date.now(), days = 120, perSender = 40, budgetMs = 3.5 * 60 * 1000;
   var sheetName = 'Teste remetentes';
   var senders = senderList_('SIM_SENDERS', typeof LISTA_TESTE !== 'undefined' ? LISTA_TESTE : prioritySenders_())
     .filter(function (s) { return s.indexOf('@') > 0; });
@@ -181,9 +184,14 @@ function simulateSenders() {
     lines.push([decision, Utilities.formatDate(it.date, tz, 'dd/MM'), it.fromEmail, oneLine_(it.subject, 90), note].join(' | '));
   };
   items.forEach(function (it) { if (it.action === 'discard') add(it, null, 'descartado', it.rule); });
+  appendLogRows_(rows.splice(0), sheetName);
   var toLlm = items.filter(function (it) { return it.action !== 'discard'; });
+  var lastCall = 0;
   for (var i = 0; i < toLlm.length; i += LLM_BATCH_SIZE) {
     if (Date.now() - started > budgetMs) { left += toLlm.length - i; break; }
+    // plano gratuito do Groq: ~1 lote por minuto no 120b; espera em vez de cair no modelo menor
+    if (lastCall) Utilities.sleep(Math.max(0, 62000 - (Date.now() - lastCall)));
+    lastCall = Date.now();
     var batch = toLlm.slice(i, i + LLM_BATCH_SIZE);
     var dec = classifyBatch_(batch) || {};
     batch.forEach(function (it) {
@@ -192,11 +200,11 @@ function simulateSenders() {
       var notify = it.mandatory || d.notify;
       add(it, d, notify ? 'AVISA' : 'quieto', notify ? d.summary : d.reason);
     });
+    appendLogRows_(rows.splice(0), sheetName); // grava a cada lote: se o tempo estourar, nada se perde
   }
-  appendLogRows_(rows, sheetName);
 
   var avisa = lines.filter(function (l) { return l.indexOf('AVISA') === 0; }).length;
-  console.log(rows.length + ' e-mails testados agora (' + avisa + ' avisariam). ' +
+  console.log(lines.length + ' e-mails testados agora (' + avisa + ' avisariam). ' +
     (left ? 'Faltam ' + left + ': rode de novo.' : 'Concluido.') + ' Aba "' + sheetName + '": ' + getLogSpreadsheet_().getUrl());
   lines.forEach(function (l) { console.log(l); });
 }

@@ -88,16 +88,23 @@ function load(opts) {
 
   const ctx = {
     console: opts.quiet === false ? console : { log() {}, warn() {}, error() {} },
-    JSON, Math, Date, String, Number, Object, Array, RegExp, Error, Boolean,
+    JSON, Math, Date, String, Number, Object, Array, RegExp, Error, Boolean, Buffer,
     PropertiesService: { getScriptProperties: () => props },
     Session: {
       getScriptTimeZone: () => 'America/Sao_Paulo',
       getEffectiveUser: () => ({ getEmail: () => 'marcelo@example.com' })
     },
-    Utilities: { formatDate: (d) => new Date(d).toISOString().slice(0, 16).replace('T', ' '), sleep: () => {} },
+    Utilities: {
+      formatDate: (d) => new Date(d).toISOString().slice(0, 16).replace('T', ' '),
+      sleep: () => {},
+      getUuid: () => 'uuid-1',
+      Charset: { UTF_8: 'UTF-8' },
+      base64Encode: (s) => Buffer.from(String(s), 'utf8').toString('base64'),
+      base64EncodeWebSafe: (s) => Buffer.from(String(s), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
+    },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     ContentService: { createTextOutput: (t) => ({ text: t }) },
-    ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: () => ({}) },
+    ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: () => ({}), getOAuthToken: () => 'oauth-token' },
     SpreadsheetApp: { openById: () => ss, create: () => ss },
     UrlFetchApp: {
       fetch: (url, params) => {

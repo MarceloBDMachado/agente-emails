@@ -16,6 +16,7 @@
  * WEBHOOK_VERIFY_TOKEN por GREEN_API_URL, GREEN_ID_INSTANCE e GREEN_API_TOKEN.
  * Se usar o TextMeBot (WA_PROVIDER=textmebot), basta TEXTMEBOT_API_KEY.
  * Se usar o ntfy (WA_PROVIDER=ntfy), basta NTFY_TOPIC (nome secreto do topico).
+ * Se usar o proprio Gmail (WA_PROVIDER=gmail), basta GROQ_API_KEY e ligar a Gmail API (GmailAlert.gs).
  *
  * Opcionais (tem valor padrao abaixo): MODE, GROQ_MODEL, WA_TEMPLATE, ALERT_EMAIL...
  */
@@ -24,7 +25,7 @@ var DEFAULTS = {
   // 'shadow': a IA so registra na planilha o que mandaria (regras fixas continuam avisando).
   // 'live'  : a IA tambem manda WhatsApp.
   MODE: 'shadow',
-  WA_PROVIDER: 'meta',          // canal: 'meta' (WhatsApp oficial), 'greenapi', 'textmebot' ou 'ntfy' (veja o README)
+  WA_PROVIDER: 'meta',          // canal: 'meta' (WhatsApp oficial), 'greenapi', 'textmebot', 'ntfy' ou 'gmail' (veja o README)
   NTFY_SERVER: 'https://ntfy.sh',
   GROQ_MODEL: 'openai/gpt-oss-120b',
   GROQ_FALLBACK_MODEL: 'openai/gpt-oss-20b',
@@ -36,6 +37,7 @@ var DEFAULTS = {
   DIGEST_HOUR: '8',
   LABEL_JOBS: 'Processos seletivos',
   LABEL_NOTIFIED: 'Agente/Avisado',
+  LABEL_ALERTS: 'Avisos',      // canal gmail: marcador das mensagens de aviso (o que toca no celular)
   ADD_LABELS: 'true',
   MAX_NOTIFICATIONS_PER_RUN: '6',
   PAUSED: 'false'

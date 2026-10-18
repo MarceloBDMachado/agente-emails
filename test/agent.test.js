@@ -145,7 +145,7 @@ test('modo shadow: so o obrigatorio vai pro WhatsApp; nota fica registrada', () 
   const groqReq = c.__calls.fetch.find((f) => f.url.includes('groq.com')).body;
   const sentItems = JSON.parse(groqReq.messages[1].content.split('\n').slice(2).join('\n'));
   assert.deepEqual(sentItems.map((i) => i.id).sort(), ['m2', 'm3']);
-  assert.deepEqual(Object.keys(sentItems[0]).sort(), ['assunto', 'de', 'dicas', 'id', 'trecho']);
+  assert.deepEqual(Object.keys(sentItems[0]).sort(), ['assunto', 'de', 'dicas', 'id', 'recebido', 'trecho']);
 });
 
 test('modo live: nota tambem vai; segunda execucao nao repete nada', () => {
@@ -338,7 +338,7 @@ test('Groq 429: espera o que o Groq pedir e tenta de novo ate 2 vezes', () => {
   assert.equal(res.ok, true);
   assert.equal(n, 3);
   assert.deepEqual(waits, [3000, 14785]);
-  assert.equal(c.__calls.fetch[0].body.max_completion_tokens, 2500);
+  assert.equal(c.__calls.fetch[0].body.max_completion_tokens, 4096);
 });
 
 test('simulateSenders: testa so os remetentes pedidos, nao mexe em nada e continua de onde parou', () => {
@@ -370,4 +370,42 @@ test('simulateSenders: testa so os remetentes pedidos, nao mexe em nada e contin
   c.simulateSenders(); // segunda rodada: tudo ja testado
   assert.equal(c.__calls.fetch.length, groqCalls);
   assert.equal(rows.length, 3);
+});
+
+test('canal gmail: aviso vira mensagem nova com marcador Avisos, fora da caixa de entrada', () => {
+  const imports = [];
+  let labelCalls = 0;
+  const c = scenario({ MODE: 'live', WA_PROVIDER: 'gmail' }, goodGroq);
+  c.UrlFetchApp.fetch = (url, params) => {
+    c.__calls.fetch.push({ url, params });
+    if (url.includes('groq.com')) {
+      const r = goodGroq(JSON.parse(params.payload));
+      return { getResponseCode: () => r.code, getContentText: () => r.body, getHeaders: () => ({}) };
+    }
+    assert.equal(params.headers.Authorization, 'Bearer oauth-token');
+    let body = '{}';
+    if (url.endsWith('/labels') && params.method === 'get') { labelCalls++; body = JSON.stringify({ labels: [{ id: 'INBOX', name: 'INBOX' }] }); }
+    if (url.endsWith('/labels') && params.method === 'post') { labelCalls++; body = JSON.stringify({ id: 'Label_7', name: 'Avisos' }); }
+    if (url.includes('/messages/import')) {
+      assert.match(url, /neverMarkSpam=true/);
+      imports.push(JSON.parse(params.payload));
+      body = JSON.stringify({ id: 'msg' + imports.length });
+    }
+    return { getResponseCode: () => 200, getContentText: () => body, getHeaders: () => ({}) };
+  };
+  const rows = c.runAgentOnce_({});
+  assert.equal(imports.length, 2); // processo seletivo + nota
+  assert.equal(labelCalls, 2); // procura e cria o marcador uma vez so
+  imports.forEach((imp) => assert.deepEqual(imp.labelIds, ['UNREAD', 'Label_7']));
+  const mime = Buffer.from(imports[1].raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  assert.match(mime, /^From: "Secretaria \(Agente\)" <agente@agente-de-emails\.invalid>/m);
+  assert.match(mime, /^Subject: =\?UTF-8\?B\?/m); // "Cálculo" tem acento
+  const body = Buffer.from(mime.split('\r\n\r\n')[1], 'base64').toString('utf8');
+  assert.match(body, /Nota G1 de Cálculo recebida: 7,0/);
+  assert.match(body, /De: Secretaria <notas@puc-rio\.br>/);
+  assert.match(body, /#all\/th3/);
+  assert.ok(rows.some((r) => r[1] === 'm3' && r[11] === 'enviado'));
+  // resumo diario: caixa de entrada, sem o marcador que toca
+  c.dailyDigest();
+  assert.deepEqual(imports[2].labelIds, ['UNREAD', 'INBOX']);
 });

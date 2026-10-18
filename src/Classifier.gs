@@ -8,9 +8,9 @@
 
 var GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 var LLM_BATCH_SIZE = 8;
-// O Groq conta prompt + max_completion_tokens no limite por minuto (plano gratuito: 8000 TPM no 120b).
-// 2500 cobre o raciocinio e o JSON de 8 e-mails e deixa caber duas chamadas por minuto.
-var LLM_MAX_TOKENS = 2500;
+// O Groq conta prompt + max_completion_tokens no limite por minuto (plano gratuito: 8000 TPM no 120b),
+// entao cabe cerca de uma chamada por minuto. Menos que isso arrisca cortar o raciocinio e o JSON.
+var LLM_MAX_TOKENS = 4096;
 
 var CATEGORIES = ['processo_seletivo', 'nota', 'academico', 'pessoal', 'financeiro', 'seguranca', 'outro', 'ruido'];
 
@@ -43,6 +43,8 @@ var SYSTEM_PROMPT = [
   'Para cada e-mail, decida se ele merece virar uma notificacao no celular. A notificacao interrompe o dia dele:',
   'so notifique o que ele precisa saber logo. O resto ele ve quando abrir o Gmail.',
   'Pergunta-chave: o e-mail MUDA algo que ele precisa fazer, saber ou decidir? Se so confirma, lembra ou divulga, nao notifique.',
+  'Cada e-mail traz "recebido" (quando chegou). Julgue como se fosse esse momento, porque o aviso sai minutos depois da chegada:',
+  'nunca use "ja passou" como motivo, e converta "hoje", "amanha" e dias da semana a partir de "recebido".',
   '',
   'NOTIFICAR (notify=true):',
   '- Processo seletivo de estagio/emprego: convite para teste, entrevista, nova etapa, aprovacao, reprovacao, pedido de documento, prazo.',
@@ -61,6 +63,9 @@ var SYSTEM_PROMPT = [
   '- Avisos em massa sem acao para ele: eventos, palestras, seminarios, feiras, campanhas, divulgacao, pesquisas de avaliacao.',
   '- Quora, newsletters, promocoes, marketing, redes sociais e "vagas recomendadas" genericas.',
   '- Confirmacao de login, codigo de verificacao, aviso de novo acesso de rotina, recibos e confirmacoes automaticas.',
+  '- Codigo, chave ou link de ativacao/redefinicao de senha que ele mesmo pediu; confirmacao de envio de tarefa;',
+  '  conclusao de um pedido dele que nao tem prazo (ex.: historico escolar emitido).',
+  '- Monitoria, plantao de duvidas, revisao ou vista de prova: so notifique se for cancelada ou mudar de data, horario ou sala.',
   '- Mensagens so informativas ou que podem esperar, mesmo de quem ele conhece.',
   'A dica "remetente prioritario" indica alguem que importa, mas o conteudo decide: aviso irrelevante dele continua notify=false.',
   'Na duvida: notifique so se perder o e-mail por um dia puder causar prejuizo real (prazo, oportunidade, nota, compromisso).',
@@ -71,7 +76,7 @@ var SYSTEM_PROMPT = [
   '  Notas sempre no formato "Nota G1 de <materia> recebida: 7,0" (use a nota do texto; se nao houver, "Nota G1 de <materia> publicada").',
   '  Processo seletivo: "<Empresa>: <o que aconteceu>", ex.: "PwC: teste online liberado".',
   '  Faculdade: "<materia ou professor>: <o que mudou>", ex.: "ENG4040: aula de amanha cancelada".',
-  '- deadline: prazo explicito no e-mail no formato "dd/mm" ou "dd/mm hh:mm"; use a data de hoje informada para converter "amanha" etc. Vazio se nao houver.',
+  '- deadline: prazo explicito no e-mail no formato "dd/mm" ou "dd/mm hh:mm"; use "recebido" para converter "amanha" etc. Vazio se nao houver.',
   '- reason: ate 60 caracteres, por que notificar ou nao.',
   '- category: uma das opcoes do esquema; use "ruido" para lixo.',
   '',
@@ -109,6 +114,7 @@ function classifyItems_(items) {
 }
 
 function classifyBatch_(batch) {
+  var tz = Session.getScriptTimeZone();
   var payloadItems = batch.map(function (it) {
     var hints = [];
     if (it.mandatory) hints.push('obrigatorio (processo seletivo)');
@@ -119,18 +125,19 @@ function classifyBatch_(batch) {
       id: it.id,
       de: oneLine_(it.fromName + ' <' + it.fromEmail + '>', 120),
       assunto: oneLine_(it.subject, 200),
+      recebido: Utilities.formatDate(it.date || new Date(), tz, 'yyyy-MM-dd (EEE) HH:mm'),
       trecho: it.snippet,
       dicas: hints
     };
   });
-  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd (EEEE) HH:mm");
+  var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd (EEEE) HH:mm");
   var userMsg = 'Hoje: ' + today + '\nE-mails (JSON):\n' + JSON.stringify(payloadItems);
   var ids = batch.map(function (it) { return it.id; });
 
   var models = [cfg('GROQ_MODEL'), cfg('GROQ_FALLBACK_MODEL')];
   for (var m = 0; m < models.length; m++) {
     var res = callGroq_(models[m], userMsg, true);
-    if (res.status === 400 && /response_format|json_schema|schema/i.test(res.text || '')) {
+    if (res.status === 400 && /response_format|json_schema|schema|json_validate/i.test(res.text || '')) {
       res = callGroq_(models[m], userMsg, false); // modelo sem suporte a esquema estrito
     }
     if (res.ok) {

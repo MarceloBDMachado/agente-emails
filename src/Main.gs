@@ -100,7 +100,7 @@ function runAgentOnce_(opts) {
         } else {
           var res = notifyWhatsApp_(notificationFor_(it));
           sent++;
-          status = res.ok ? 'aceito pela Meta' : 'ERRO: ' + res.error;
+          status = res.ok ? 'enviado' : 'ERRO: ' + res.error;
           if (res.ok) { bumpStats_('sent'); labelNotified_(it); } else { sendErrors.push({ item: it, error: res.error }); }
         }
       } else {
@@ -212,7 +212,9 @@ function notificationFor_(it) {
     summary: d.summary || it.subject,
     deadline: d.deadline || '',
     category: it.mandatory ? 'processo_seletivo' : (d.category || 'outro'),
-    threadId: it.threadId
+    threadId: it.threadId,
+    fromEmail: it.fromEmail,
+    subject: it.subject
   };
 }
 

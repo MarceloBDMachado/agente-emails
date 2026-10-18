@@ -11,6 +11,8 @@
  *
  * 'textmebot': TextMeBot (nao oficial, pago, ~US$ 1/mes para 1 destinatario). Conecta a
  *   SUA conta de WhatsApp e manda texto livre sempre.
+ *
+ * 'gmail' (GmailAlert.gs) e 'ntfy' (Ntfy.gs) nao usam WhatsApp: veja os arquivos.
  */
 
 var CATEGORY_LABEL = {
@@ -26,6 +28,7 @@ var CATEGORY_LABEL = {
 
 /** Envia um aviso de e-mail. n = { fromName, summary, deadline, category } */
 function notifyWhatsApp_(n) {
+  if (isGmailChannel_()) return gmailNotify_(n);
   if (isNtfy_()) return ntfyNotify_(n);
   if (isFreeTextProvider_()) return sendFreeText_(formatNotificationText_(n));
   if (isServiceWindowOpen_()) {
@@ -120,11 +123,12 @@ function isGreenApi_() {
 /** Provedores sem template nem janela de 24h. */
 function isFreeTextProvider_() {
   var p = cfg('WA_PROVIDER');
-  return p === 'greenapi' || p === 'textmebot' || p === 'ntfy';
+  return p === 'greenapi' || p === 'textmebot' || p === 'ntfy' || p === 'gmail';
 }
 
 function sendFreeText_(text) {
   var p = cfg('WA_PROVIDER');
+  if (p === 'gmail') return gmailText_(text);
   if (p === 'ntfy') return ntfyText_(text);
   return p === 'textmebot' ? textMeBotSend_(text) : greenSendText_(text);
 }
