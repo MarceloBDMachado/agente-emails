@@ -22,14 +22,16 @@ var JOB_DOMAINS = [
   'testgorilla.com', 'eureca.me', 'recrut.ai', 'bettha.com', 'pandape.com.br', 'abler.com.br'
 ];
 
-/** Assuntos de plataformas de vaga que sao marketing, nao processo seletivo. */
-var JOB_MARKETING_SUBJECT = /(vagas? (para voc[eê]|recomendad|que combinam|novas?)|newsletter|webinar|dicas? de carreira|conte[uú]do exclusivo|jobs? for you|recommended jobs)/i;
+/** Assuntos de plataformas de vaga que sao marketing ou cadastro, nao processo seletivo. */
+var JOB_MARKETING_SUBJECT = /(vagas? (para voc[eê]|recomendad|que combinam|novas?|do dia)|newsletter|webinar|dicas? de carreira|conte[uú]do exclusivo|jobs? for you|recommended jobs|confirme? (o |seu )?e-?mail|cadastro.{0,30}(confirmad|realizad|conclu[ií]d)|verify your email|redefini[cç][aã]o de senha|reset (your )?password)/i;
 
 /** Ruido conhecido (camada 1). Cada regra: from e/ou subject (regex). */
 var DISCARD_RULES = [
   { name: 'Quora', from: /(^|[@.])quora\.com$/i },
   { name: 'Cardapio PUC Urgente', any: /puc ?urgente/i, subject: /card[aá]pio|menu|bandej[aã]o|restaurante/i },
   { name: 'Confirmacao de login', subject: /(novo (acesso|login|dispositivo)|new (sign-?in|login|device)|sign-?in (alert|attempt|detected)|login (detectado|realizado|confirm)|acesso (detectado|realizado) [àa] sua conta|someone signed in|voc[eê] (fez|acabou de fazer) login)/i },
+  { name: 'Login com Google em outro site', subject: /(compartilhou alguns dados da sua conta do google|shared some of your google account data)/i },
+  { name: 'Sugestao de vagas', subject: /(vagas? do dia|sugest[aã]o de vagas?|job alert|novas vagas para)/i },
   { name: 'Codigo de verificacao', subject: /(c[oó]digo de (verifica[cç][aã]o|acesso|seguran[cç]a|confirma[cç][aã]o)|verification code|security code|one-time (code|password|passcode)|\bOTP\b|seu c[oó]digo|your code)/i }
 ];
 

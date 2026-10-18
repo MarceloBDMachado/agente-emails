@@ -47,6 +47,14 @@ test('regras: descarte, obrigatorio e zona cinza', () => {
   assert.equal(r({ fromEmail: 'loja@x.com', subject: 'Promo', category: 'promotions', labels: ['Processos seletivos'] }), 'mandatory');
   assert.equal(r({ fromEmail: 'prof@puc-rio.br', subject: 'Prova adiada' }), 'llm');
   assert.equal(r({ fromEmail: 'fake@notgupy.io', subject: 'x' }), 'llm'); // dominio parecido nao conta
+  // casos reais da caixa de entrada
+  assert.equal(r({ fromEmail: 'noreply-accounts@google.com', subject: 'Você compartilhou alguns dados da sua Conta do Google com gupy.io' }), 'discard');
+  assert.equal(r({ fromEmail: 'sugestaovagas@catho.com.br', subject: 'Marcelo, chegou a sua vaga do dia (18/10) para QA' }), 'discard');
+  assert.equal(r({ fromEmail: 'no-reply@eureca.me', subject: 'Confirme seu e-mail na Eureca' }), 'discard');
+  assert.equal(r({ fromEmail: 'noreply@eureca.me', subject: 'Seu cadastro na Eureca está confirmado. 🚀' }), 'discard');
+  assert.equal(r({ fromEmail: 'contact@jobconvo.com', subject: 'Adecco | Mensagem sobre o processo Programa de Estágio PwC Brasil 2027' }), 'mandatory');
+  assert.equal(r({ fromEmail: 'rh@myworkday.com', subject: 'Obrigado pelo seu interesse na Empresa!' }), 'mandatory');
+  assert.equal(r({ fromEmail: 'moodle-rdc@puc-rio.br', subject: 'Vencimento em segunda-feira, 19 out. 2026, 23:59: Trabalho 1' }), 'llm');
 });
 
 test('parseLlmDecisions_ valida ids e normaliza campos', () => {
