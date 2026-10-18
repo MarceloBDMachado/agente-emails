@@ -1,7 +1,7 @@
-# Agente de Emails 📬 → 💬
+# Agente de Emails 📬 → 🔔
 
-> Um agente que lê meu Gmail a cada 10 minutos, joga fora o ruído, usa uma IA para julgar o que sobra e me manda no WhatsApp só o que importa.
-> *An email-triage agent: Gmail → rules + LLM (Groq) → WhatsApp. Runs free, 24/7, on Google Apps Script.*
+> Um agente que lê meu Gmail a cada 10 minutos, joga fora o ruído, usa uma IA para julgar o que sobra e faz o celular tocar só para o que importa.
+> *An email-triage agent: Gmail → rules + LLM (Groq) → phone alert (Gmail label or WhatsApp). Runs free, 24/7, on Google Apps Script.*
 
 Minha caixa de entrada tem milhares de e-mails não lidos (Quora, cardápio do bandejão, código de login...) e no meio deles chegam coisas que não posso perder: convite para teste de processo seletivo, nota de prova, professor remarcando aula. Este projeto resolve isso:
 
@@ -20,12 +20,14 @@ De: Secretaria CCE
 
 - **Roda sozinho, com o PC desligado.** Apps Script executa na nuvem do Google a cada 10 min.
 - **Funil em 3 camadas:** regras fixas descartam o ruído conhecido, regras fixas garantem os processos seletivos e uma IA decide o resto.
+- **O conteúdo decide, não só o remetente:** o sistema de avisos da faculdade manda nota, aula cancelada e "postei exercício de revisão" pelo mesmo endereço. A IA avisa os dois primeiros e cala o terceiro.
 - **IA com critério:** uma política escrita (o que avisar e o que não avisar) e exemplos reais. Ela também escreve o resumo da notificação, como em "Nota G1 de \<matéria\> recebida: 7,0".
-- **Nunca perde o que importa:** se a IA cair, processos seletivos são avisados mesmo assim; se o WhatsApp recusar, o aviso vai por e-mail.
+- **Nunca perde o que importa:** se a IA cair, processos seletivos são avisados mesmo assim; se o canal recusar, o aviso vai por e-mail.
+- **Aviso pelo próprio Gmail:** cada aviso vira uma mensagem curta no marcador `Avisos`; no celular só esse marcador toca. Sem app extra, sem segundo número. WhatsApp (Meta ou Green API) continua como opção.
 - **Modo teste (shadow):** no começo a IA só registra numa planilha o que *mandaria*. Você confere as decisões e depois liga de verdade.
 - **Resumo diário às 8h**, que também funciona como sinal de vida.
-- **Comandos pelo WhatsApp:** `status`, `pausar`, `retomar`.
-- **Grátis:** Apps Script, Groq (plano free) e WhatsApp Cloud API (número de teste) ou Green API (plano Developer).
+- **Comandos pelo WhatsApp** (canal Meta): `status`, `pausar`, `retomar`.
+- **Grátis:** Apps Script, Groq (plano free) e Gmail. WhatsApp Cloud API (número de teste) e Green API (plano Developer) também são gratuitos.
 
 ## Como funciona
 
@@ -36,7 +38,7 @@ flowchart LR
     R1 --> R2{Camada 2<br/>obrigatório}
     R2 -- marcador 'Processos seletivos'<br/>ou plataforma de vagas --> IA1[IA só resume]
     R2 --> IA2{Camada 3<br/>IA decide}
-    IA1 --> W[WhatsApp]
+    IA1 --> W[Aviso no celular<br/>marcador 'Avisos' ou WhatsApp]
     IA2 -- avisar --> W
     IA2 -- não avisar --> X
     W -. falhou .-> E[e-mail de alerta]
@@ -48,7 +50,8 @@ flowchart LR
 | `src/Main.gs` | Loop principal (`runAgent`): busca, aplica o funil, envia, registra |
 | `src/Rules.gs` | Camadas 1 e 2: listas de descarte e de plataformas de recrutamento |
 | `src/Classifier.gs` | Camada 3: prompt, esquema JSON e chamada ao Groq |
-| `src/WhatsApp.gs` | Envio (Cloud API da Meta ou Green API) |
+| `src/GmailAlert.gs` | Canal Gmail: cria a mensagem de aviso no marcador `Avisos` (Gmail API) |
+| `src/WhatsApp.gs` | Envio pelo WhatsApp (Cloud API da Meta ou Green API) e escolha do canal |
 | `src/Webhook.gs` | Recebe da Meta os status de entrega e os comandos |
 | `src/Store.gs` | IDs já processados, estatísticas e planilha de log |
 | `src/Digest.gs` | Resumo diário |
@@ -71,7 +74,7 @@ flowchart LR
 
 ## Passo a passo para replicar
 
-Tempo estimado: 40 minutos. Você precisa de uma conta Google e de uma conta no Facebook (para a Meta) **ou** de um segundo número de WhatsApp (para a Green API).
+Tempo estimado: 20 minutos com o canal Gmail (só precisa de uma conta Google). Com WhatsApp, 40 minutos e uma conta no Facebook (Meta) **ou** um segundo número de WhatsApp (Green API).
 
 ### 1. Filtro do Gmail (rede de segurança)
 
@@ -83,7 +86,18 @@ Crie o filtro descrito em [docs/gmail-filter.txt](docs/gmail-filter.txt), trocan
 2. Vá em **API Keys > Create API Key** e copie a chave.
 3. Recomendado: em **Settings > Data Controls**, ative **Zero Data Retention**.
 
-### 3. WhatsApp: escolha um provedor
+### 3. Canal de aviso: escolha um
+
+**Opção recomendada: o próprio Gmail (`WA_PROVIDER=gmail`)**
+
+Cada aviso vira uma mensagem curta (assunto = resumo da IA, corpo com remetente, prazo e link para o e-mail original) criada no marcador `Avisos`, fora da caixa de entrada, pela Gmail API (`users.messages.import`). Criar uma mensagem nova, em vez de só marcar o e-mail original, garante a notificação: o app do Gmail notifica mensagem que chega.
+
+1. No editor do Apps Script, em **Serviços > +**, adicione a **Gmail API** (o Google pede para aceitar os termos de uso das APIs).
+2. Em **Propriedades do script**, defina `WA_PROVIDER` = `gmail`. Não precisa de `WA_TO` nem de token.
+3. Rode `testWhatsApp`: o marcador `Avisos` é criado com uma mensagem de teste.
+4. No app do Gmail do celular: **Configurações > sua conta**. Desligue **Notificações da caixa de entrada**. Em **Gerenciar marcadores > Avisos**, sincronize os últimos 30 dias e ligue **Notificações do marcador** e **Notificar sobre todas as mensagens**.
+
+> Por que não WhatsApp no seu próprio número? Mensagens que você manda para você mesmo nunca notificam no WhatsApp, e serviços como TextMeBot enviam *como* você (dispositivo conectado). Para tocar, o remetente precisa ser outro número: Meta (opção A) ou um segundo chip (opção B).
 
 **Opção A: WhatsApp Cloud API (oficial, da Meta)**
 
@@ -115,8 +129,8 @@ Crie o filtro descrito em [docs/gmail-filter.txt](docs/gmail-filter.txt), trocan
    | Propriedade | Valor |
    |---|---|
    | `GROQ_API_KEY` | chave do Groq |
-   | `WA_TO` | seu número só com dígitos e DDI, ex. `5521999998888` |
-   | `WA_PROVIDER` | `meta` (padrão) ou `greenapi` |
+   | `WA_TO` | *(WhatsApp)* seu número só com dígitos e DDI, ex. `5521999998888` |
+   | `WA_PROVIDER` | `gmail` (recomendado), `meta` (padrão) ou `greenapi` |
    | `WA_TOKEN` | *(Meta)* token permanente |
    | `WA_PHONE_NUMBER_ID` | *(Meta)* "Identificação do número de telefone" |
    | `WEBHOOK_VERIFY_TOKEN` | *(Meta)* um texto aleatório qualquer |
@@ -125,7 +139,7 @@ Crie o filtro descrito em [docs/gmail-filter.txt](docs/gmail-filter.txt), trocan
    Opcionais: `MODE` (`shadow` ou `live`), `RUN_EVERY_MINUTES` (1, 5, 10, 15 ou 30), `DIGEST_HOUR`, `ALERT_EMAIL`, `GROQ_MODEL`.
 
 4. No editor, selecione `testGroq` e clique em **Executar**. Na primeira vez o Google pede autorização (Gmail, Planilhas, requisições externas); como o app é seu e não verificado, clique em *Avançado > Acessar Agente de Emails*.
-5. Rode `testWhatsApp`. Com a Meta, `ok` significa que ela aceitou; confirme que chegou no celular. Se não chegar, rode `showStatus` depois de 1 minuto (precisa do webhook).
+5. Rode `testWhatsApp` (manda um aviso de teste pelo canal escolhido). Com a Meta, `ok` significa que ela aceitou; confirme que chegou no celular. Se não chegar, rode `showStatus` depois de 1 minuto (precisa do webhook).
 6. Rode `dryRunLast24h`: o agente simula as últimas 24h sem enviar nada e grava as decisões na aba **Simulacao** da planilha "Agente de Emails - Log" (no seu Drive). Ajuste `src/Rules.gs` ou o prompt em `src/Classifier.gs` se discordar de algo.
 7. Rode `setup`. Ele cria os gatilhos (a cada 10 min e o resumo das 8h), a planilha e o marcador `Agente/Avisado`.
 
@@ -154,6 +168,7 @@ Depois de alguns dias em `shadow`, confira a aba **Log** da planilha. Se as deci
 
 ## Uso no dia a dia
 
+- **Marcador `Avisos`** (canal Gmail): só o que a IA decidiu que vale tocar o celular. O resumo diário das 8h chega na caixa de entrada, sem tocar.
 - **WhatsApp:** mande `status`, `pausar`, `retomar` ou `ajuda` para o número do bot (só na Meta). Mandar qualquer mensagem também abre a janela de 24h, e os avisos passam a chegar em texto livre, mais legível que o template.
 - **Planilha de log:** cada e-mail analisado vira uma linha com a camada, a regra, a decisão, o resumo e o motivo da IA.
 - **Marcador `Agente/Avisado`** no Gmail: conversas que viraram notificação.
@@ -169,6 +184,10 @@ Depois de alguns dias em `shadow`, confira a aba **Log** da planilha. Se as deci
 | **190** *Invalid OAuth access token* | Token temporário expirado. Use o token do usuário do sistema (passo 3A.5). |
 | Template rejeitado como Marketing | Use o corpo com três variáveis do passo 3A.4. |
 | `Falta a propriedade do script "X"` | Adicione a propriedade em Configurações do projeto. |
+| Canal Gmail: `Gmail HTTP 403` *"Gmail API has not been used in project"* | Adicione a Gmail API em Serviços (passo 3). |
+| Canal Gmail: a mensagem aparece em `Avisos`, mas o celular não toca | No app do Gmail, confira as notificações do marcador `Avisos` e se a sincronização dele está ligada. |
+| WhatsApp chega mas não toca (TextMeBot e parecidos) | Mensagem para o próprio número nunca notifica. Use o canal Gmail ou um remetente diferente. |
+| Groq `429` *tokens per minute* | Plano gratuito: 8000 tokens/min no `gpt-oss-120b`, o que dá cerca de 1 lote de 8 e-mails por minuto. O agente espera o tempo pedido e tenta de novo. |
 
 ## Limitações
 
@@ -182,7 +201,7 @@ Depois de alguns dias em `shadow`, confira a aba **Log** da planilha. Se as deci
 npm test
 ```
 
-Os testes carregam os arquivos `.gs` em um contexto isolado do Node com Gmail, Groq e Meta simulados. Eles cobrem as regras, a limpeza de texto, a validação da resposta da IA, os modos `shadow`/`live`, a IA fora do ar, a recusa do WhatsApp, a janela de 24h, a simulação, o limite de avisos por execução e a Green API.
+Os testes carregam os arquivos `.gs` em um contexto isolado do Node com Gmail, Groq e Meta simulados. Eles cobrem as regras e as listas de remetentes, a limpeza de texto, a validação da resposta da IA (inclusive quando ela pula e-mails), o limite por minuto do Groq, os modos `shadow`/`live`, a IA fora do ar, a recusa do canal, a janela de 24h, a simulação, o limite de avisos por execução, o canal Gmail e os provedores de WhatsApp.
 
 ## Licença
 
