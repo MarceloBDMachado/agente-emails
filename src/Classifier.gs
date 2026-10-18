@@ -8,6 +8,9 @@
 
 var GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 var LLM_BATCH_SIZE = 8;
+// O Groq conta prompt + max_completion_tokens no limite por minuto (plano gratuito: 8000 TPM no 120b).
+// 2500 cobre o raciocinio e o JSON de 8 e-mails e deixa caber duas chamadas por minuto.
+var LLM_MAX_TOKENS = 2500;
 
 var CATEGORIES = ['processo_seletivo', 'nota', 'academico', 'pessoal', 'financeiro', 'seguranca', 'outro', 'ruido'];
 
@@ -151,7 +154,7 @@ function callGroq_(model, userMsg, strictSchema) {
     response_format: strictSchema
       ? { type: 'json_schema', json_schema: { name: 'email_decisions', strict: true, schema: DECISION_SCHEMA } }
       : { type: 'json_object' },
-    max_completion_tokens: 4096
+    max_completion_tokens: LLM_MAX_TOKENS
   };
   if (/gpt-oss/.test(model)) {
     body.reasoning_effort = cfg('GROQ_REASONING_EFFORT');
@@ -167,11 +170,9 @@ function callGroq_(model, userMsg, strictSchema) {
     };
     var resp = UrlFetchApp.fetch(GROQ_URL, params);
     var code = resp.getResponseCode();
-    if (code === 429) {
-      // limite por minuto do plano gratuito: espera o que o Groq pedir (ate 20 s) e tenta mais uma vez
-      var h = resp.getHeaders ? resp.getHeaders() : {};
-      var wait = Math.min(Math.max(Number(h['retry-after'] || h['Retry-After']) || 5, 1), 20);
-      Utilities.sleep(wait * 1000);
+    for (var retry = 0; code === 429 && retry < 2; retry++) {
+      // limite por minuto do plano gratuito: espera o que o Groq pedir e tenta de novo
+      Utilities.sleep(groqRetryWaitMs_(resp));
       resp = UrlFetchApp.fetch(GROQ_URL, params);
       code = resp.getResponseCode();
     }
@@ -183,6 +184,17 @@ function callGroq_(model, userMsg, strictSchema) {
   } catch (e) {
     return { ok: false, status: 0, text: String(e) };
   }
+}
+
+/** Quanto esperar depois de um 429: cabecalho retry-after ou "try again in 13.7s" do corpo (+1 s, max 30 s). */
+function groqRetryWaitMs_(resp) {
+  var h = resp.getHeaders ? resp.getHeaders() : {};
+  var secs = Number(h['retry-after'] || h['Retry-After']);
+  if (!secs) {
+    var m = String(resp.getContentText() || '').match(/try again in (?:(\d+)m)?([\d.]+)s/i);
+    secs = m ? Number(m[1] || 0) * 60 + Number(m[2]) : 10;
+  }
+  return Math.min(secs + 1, 30) * 1000;
 }
 
 /**

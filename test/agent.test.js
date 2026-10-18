@@ -322,17 +322,23 @@ test('remetente prioritario chega na IA com a dica; o conteudo decide', () => {
   assert.ok(!sent.find((i) => i.id === 'm2').dicas.some((h) => /prioritario/.test(h)));
 });
 
-test('Groq 429: espera o retry-after e tenta de novo uma vez', () => {
+test('Groq 429: espera o que o Groq pedir e tenta de novo ate 2 vezes', () => {
   let n = 0;
+  const waits = [];
   const c = load({
     props: { GROQ_API_KEY: 'k' },
     fetch: () => (++n === 1
       ? { code: 429, body: 'rate limit', headers: { 'retry-after': '2' } }
-      : { code: 200, body: JSON.stringify({ choices: [{ message: { content: '{"decisions":[]}' } }] }) })
+      : n === 2
+        ? { code: 429, body: '{"error":{"message":"Rate limit reached ... Please try again in 13.785s."}}' }
+        : { code: 200, body: JSON.stringify({ choices: [{ message: { content: '{"decisions":[]}' } }] }) })
   });
+  c.Utilities.sleep = (ms) => waits.push(ms);
   const res = c.callGroq_('openai/gpt-oss-120b', 'oi', true);
   assert.equal(res.ok, true);
-  assert.equal(n, 2);
+  assert.equal(n, 3);
+  assert.deepEqual(waits, [3000, 14785]);
+  assert.equal(c.__calls.fetch[0].body.max_completion_tokens, 2500);
 });
 
 test('simulateSenders: testa so os remetentes pedidos, nao mexe em nada e continua de onde parou', () => {
