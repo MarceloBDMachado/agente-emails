@@ -55,6 +55,12 @@ test('regras: descarte, obrigatorio e zona cinza', () => {
   assert.equal(r({ fromEmail: 'contact@jobconvo.com', subject: 'Adecco | Mensagem sobre o processo Programa de Estágio PwC Brasil 2027' }), 'mandatory');
   assert.equal(r({ fromEmail: 'rh@myworkday.com', subject: 'Obrigado pelo seu interesse na Empresa!' }), 'mandatory');
   assert.equal(r({ fromEmail: 'moodle-rdc@puc-rio.br', subject: 'Vencimento em segunda-feira, 19 out. 2026, 23:59: Trabalho 1' }), 'llm');
+  // revisao/vista de prova e monitoria: descarte fixo; com nota no assunto, vai para a IA
+  ['ProbEst | Revisão G4', 'REVISÃO P2', 'AMANHÃ VISTA DA P2 E AULA', 'MAT4202 - Álgebra Linear II: Revisão da G3 (Nova Data/Horário)',
+   'ENG 4501: Revisão G3 (amanhã, 02/07, 15h-16h, L-258)', 'MONITORIA EXTRA NA QUARTA E CRONOGRAMA']
+    .forEach((subject) => assert.equal(r({ fromEmail: 'autosau@puc-rio.br', subject }), 'discard', subject));
+  ['ProbEst - Notas G3, revisão G3 e instruções para PF', 'P3 HOJE 17:00 HORAS', 'Revisão do contrato de estágio', 'Dúvidas']
+    .forEach((subject) => assert.equal(r({ fromEmail: 'autosau@puc-rio.br', subject }), 'llm', subject));
 });
 
 test('parseLlmDecisions_ valida ids e normaliza campos', () => {

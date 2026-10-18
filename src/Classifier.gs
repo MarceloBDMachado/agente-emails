@@ -147,6 +147,9 @@ function classifyBatch_(batch, isRetry) {
     }
     if (res.ok) {
       var parsed = parseLlmDecisions_(res.content, ids);
+      if (parsed && m > 0) {
+        for (var pid in parsed) parsed[pid].reason = oneLine_('[modelo reserva] ' + parsed[pid].reason, 100);
+      }
       if (parsed) {
         // a IA as vezes devolve so os que avisam; pergunta de novo, uma vez, pelos que faltaram
         var missing = batch.filter(function (it) { return !parsed[it.id]; });

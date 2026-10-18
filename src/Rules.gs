@@ -33,6 +33,9 @@ var DISCARD_RULES = [
   { name: 'Confirmacao de login', subject: /(novo (acesso|login|dispositivo)|new (sign-?in|login|device)|sign-?in (alert|attempt|detected)|login (detectado|realizado|confirm)|acesso (detectado|realizado) [àa] sua conta|someone signed in|voc[eê] (fez|acabou de fazer) login)/i },
   { name: 'Login com Google em outro site', subject: /(compartilhou alguns dados da sua conta do google|shared some of your google account data)/i },
   { name: 'Sugestao de vagas', subject: /(vagas? do dia|sugest[aã]o de vagas?|job alert|novas vagas para)/i },
+  // revisao/vista de prova e monitoria nunca avisam (a IA errava quando vinham varias juntas);
+  // assunto que fala de nota continua indo para a IA ("Notas G3, revisao G3 e instrucoes para PF")
+  { name: 'Revisao, vista de prova ou monitoria', subject: /^(?!.*\b(notas?|graus?)\b).*(\b(revis[aã]o|vista)\b.{0,15}\b(prova|[pg]\d|pf)\b|\bmonitoria\b|plant[aã]o de d[uú]vidas)/i },
   { name: 'Codigo de verificacao', subject: /(c[oó]digo de (verifica[cç][aã]o|acesso|seguran[cç]a|confirma[cç][aã]o)|chave de ativa[cç][aã]o|verification code|security code|one-time (code|password|passcode)|\bOTP\b|seu c[oó]digo|your code)/i }
 ];
 
