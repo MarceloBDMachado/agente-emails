@@ -7,6 +7,8 @@
  *   dryRunLast24h()  simula o agente nas ultimas 24h e grava na aba "Simulacao" (nao envia nada)
  *   showStatus()     mostra o estado atual no registro de execucao
  *   uninstall()      remove os gatilhos (o agente para)
+ *   senderReport()   levanta quem te manda e-mail e quanto voce le (aba "Remetentes")
+ *   simulateSenders() testa a IA nos e-mails reais de alguns remetentes (aba "Teste remetentes")
  */
 
 function requiredProps_() {
@@ -72,4 +74,129 @@ function showStatus() {
   console.log(statusText_());
   console.log('Falhas recentes do WhatsApp: ' + JSON.stringify(getJsonState('WA_FAILURES', [])));
   console.log('Pendentes (esperando IA): ' + JSON.stringify(getJsonState('PENDING', {})));
+}
+
+/**
+ * Levantamento de remetentes dos ultimos 120 dias (sem Promocoes/Social/Foruns), para montar
+ * a lista de notificacao prioritaria. Grava na aba "Remetentes" da planilha de log.
+ * Sinais: quantos e-mails, quantos voce leu, quantos o Gmail marcou como importantes,
+ * e em quantos voce respondeu.
+ */
+function senderReport() {
+  var days = 120, maxThreads = 2500, started = Date.now();
+  var q = 'newer_than:' + days + 'd -in:sent -in:chats -category:promotions -category:social -category:forums';
+  var me = myAddresses_();
+  var stats = {};
+  var total = 0;
+  for (var start = 0; start < maxThreads; start += 100) {
+    if (Date.now() - started > 4 * 60 * 1000) break;
+    var threads = GmailApp.search(q, start, 100);
+    if (!threads.length) break;
+    var msgs = GmailApp.getMessagesForThreads(threads);
+    threads.forEach(function (t, i) {
+      var first = null, replied = false;
+      msgs[i].forEach(function (m) {
+        var f = parseFrom_(m.getFrom());
+        if (me.indexOf(f.email) >= 0) replied = true;
+        else if (!first) first = m;
+      });
+      if (!first) return;
+      total++;
+      var from = parseFrom_(first.getFrom());
+      var s = stats[from.email] || (stats[from.email] = { name: from.name, email: from.email, n: 0, read: 0, important: 0, replied: 0, last: 0, subjects: [] });
+      s.n++;
+      if (!t.isUnread()) s.read++;
+      if (t.isImportant()) s.important++;
+      if (replied) s.replied++;
+      var d = t.getLastMessageDate().getTime();
+      if (d > s.last) s.last = d;
+      if (s.subjects.length < 3) s.subjects.push(oneLine_(t.getFirstMessageSubject(), 70));
+    });
+  }
+  var tz = Session.getScriptTimeZone();
+  var rows = Object.keys(stats).map(function (k) { return stats[k]; })
+    .sort(function (a, b) { return (b.replied * 5 + b.read) - (a.replied * 5 + a.read) || b.n - a.n; });
+  var header = ['E-mail', 'Nome', 'E-mails', 'Lidos', '% lidos', 'Importantes', 'Respondidos', 'Ultimo', 'Exemplos de assunto'];
+  var values = rows.map(function (s) {
+    return [s.email, s.name, s.n, s.read, Math.round(100 * s.read / s.n), s.important, s.replied,
+      Utilities.formatDate(new Date(s.last), tz, 'yyyy-MM-dd'), s.subjects.join(' | ')];
+  });
+  var ss = getLogSpreadsheet_();
+  var sh = ss.getSheetByName('Remetentes') || ss.insertSheet('Remetentes');
+  sh.clear();
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
+  if (values.length) sh.getRange(2, 1, values.length, header.length).setValues(values);
+  sh.setFrozenRows(1);
+  console.log(total + ' conversas, ' + rows.length + ' remetentes. Aba "Remetentes": ' + ss.getUrl());
+  rows.slice(0, 150).forEach(function (s) {
+    console.log([s.email, s.name, 'n=' + s.n, 'lidos=' + s.read, 'imp=' + s.important, 'resp=' + s.replied, s.subjects.join(' | ')].join(' ; '));
+  });
+}
+
+/**
+ * Testa a IA nos e-mails reais de alguns remetentes (ate 40 conversas de cada, ultimos 120 dias),
+ * sem avisar, marcar ou mudar nada. Resultado na aba "Teste remetentes" e no registro de execucao.
+ * Remetentes: propriedade SIM_SENDERS (separados por virgula), LISTA_TESTE do Listas.gs ou,
+ * sem nenhuma das duas, a lista prioritaria.
+ * Se o tempo acabar, rode de novo: continua de onde parou. Para refazer do zero, apague a aba.
+ */
+function simulateSenders() {
+  var started = Date.now(), days = 120, perSender = 40, budgetMs = 4.5 * 60 * 1000;
+  var sheetName = 'Teste remetentes';
+  var senders = senderList_('SIM_SENDERS', typeof LISTA_TESTE !== 'undefined' ? LISTA_TESTE : prioritySenders_())
+    .filter(function (s) { return s.indexOf('@') > 0; });
+
+  var done = {};
+  var old = getLogSpreadsheet_().getSheetByName(sheetName);
+  if (old && old.getLastRow() > 1) {
+    old.getRange(2, 2, old.getLastRow() - 1, 1).getValues().forEach(function (r) { done[r[0]] = true; });
+  }
+
+  var me = myAddresses_();
+  var items = [];
+  senders.forEach(function (s) {
+    var threads = GmailApp.search('from:' + s + ' newer_than:' + days + 'd', 0, perSender);
+    if (!threads.length) return;
+    var msgs = GmailApp.getMessagesForThreads(threads);
+    threads.forEach(function (t, i) {
+      var labels = t.getLabels().map(function (l) { return l.getName(); });
+      msgs[i].forEach(function (m) {
+        if (done[m.getId()] || parseFrom_(m.getFrom()).email !== s) return;
+        items.push(itemFromMessage_(m, t, labels, '', me));
+      });
+    });
+  });
+  items.forEach(function (it) {
+    var r = applyRules_(it);
+    it.action = r.action;
+    it.rule = r.rule;
+    it.mandatory = r.action === 'mandatory';
+    it.priority = !!r.priority;
+  });
+
+  var tz = Session.getScriptTimeZone();
+  var rows = [], lines = [], left = 0;
+  var add = function (it, d, decision, note) {
+    rows.push(logRow_(it, d, decision, '', tz));
+    lines.push([decision, Utilities.formatDate(it.date, tz, 'dd/MM'), it.fromEmail, oneLine_(it.subject, 90), note].join(' | '));
+  };
+  items.forEach(function (it) { if (it.action === 'discard') add(it, null, 'descartado', it.rule); });
+  var toLlm = items.filter(function (it) { return it.action !== 'discard'; });
+  for (var i = 0; i < toLlm.length; i += LLM_BATCH_SIZE) {
+    if (Date.now() - started > budgetMs) { left += toLlm.length - i; break; }
+    var batch = toLlm.slice(i, i + LLM_BATCH_SIZE);
+    var dec = classifyBatch_(batch) || {};
+    batch.forEach(function (it) {
+      var d = dec[it.id];
+      if (!d) { left++; return; } // sem resposta da IA: fica para a proxima rodada
+      var notify = it.mandatory || d.notify;
+      add(it, d, notify ? 'AVISA' : 'quieto', notify ? d.summary : d.reason);
+    });
+  }
+  appendLogRows_(rows, sheetName);
+
+  var avisa = lines.filter(function (l) { return l.indexOf('AVISA') === 0; }).length;
+  console.log(rows.length + ' e-mails testados agora (' + avisa + ' avisariam). ' +
+    (left ? 'Faltam ' + left + ': rode de novo.' : 'Concluido.') + ' Aba "' + sheetName + '": ' + getLogSpreadsheet_().getUrl());
+  lines.forEach(function (l) { console.log(l); });
 }

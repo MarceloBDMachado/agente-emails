@@ -66,7 +66,11 @@ function load(opts) {
       getLastRow: () => rows.length,
       appendRow: (r) => rows.push(r),
       setFrozenRows: () => {},
-      getRange: () => ({ setFontWeight: () => {}, setValues: (vals) => vals.forEach((v) => rows.push(v)) }),
+      getRange: (r, c, n, w) => ({
+        setFontWeight: () => {},
+        setValues: (vals) => vals.forEach((v) => rows.push(v)),
+        getValues: () => rows.slice(r - 1, r - 1 + n).map((row) => row.slice(c - 1, c - 1 + w))
+      }),
       deleteRows: (start, n) => rows.splice(start - 1, n),
       getParent: () => ss
     };
@@ -99,14 +103,17 @@ function load(opts) {
       fetch: (url, params) => {
         calls.fetch.push({ url, params, body: params && params.payload ? JSON.parse(params.payload) : null });
         const r = (opts.fetch || (() => ({ code: 200, body: '{}' })))(url, params);
-        return { getResponseCode: () => r.code, getContentText: () => r.body };
+        return { getResponseCode: () => r.code, getContentText: () => r.body, getHeaders: () => r.headers || {} };
       }
     },
     GmailApp: {
       search: (q) => {
         const cat = (q.match(/category:(\w+)/) || [])[1];
-        return threads.filter((t) => !cat || t._category === cat);
+        const from = (q.match(/from:(\S+)/) || [])[1];
+        return threads.filter((t) => (!cat || t._category === cat) &&
+          (!from || t.getMessages().some((m) => m.getFrom().toLowerCase().includes(from))));
       },
+      getMessagesForThreads: (ts) => ts.map((t) => t.getMessages()),
       getAliases: () => [],
       getMessageById: (id) => {
         for (const t of threads) for (const m of t.getMessages()) if (m.getId() === id) return Object.assign(m, { getThread: () => t });

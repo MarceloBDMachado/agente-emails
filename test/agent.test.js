@@ -291,3 +291,77 @@ test('canal ntfy: 429 tenta de novo uma vez; texto livre sem asteriscos', () => 
   assert.equal(n, 2);
   assert.equal(bodies[0].message, '☀️ Resumo\nok');
 });
+
+test('listas pessoais: prioritario sempre vai pra IA com dica; silenciado e descartado', () => {
+  const c = load({ props: { PRIORITY_SENDERS: 'autosau@puc-rio.br, orientadora.com', MUTED_SENDERS: 'catho.com.br;jira@lab.atlassian.net' } });
+  const r = (o) => c.applyRules_(Object.assign({ fromName: '', fromEmail: '', subject: '', labels: [], category: '' }, o));
+  const p = r({ fromEmail: 'autosau@puc-rio.br', subject: 'Seu código de verificação', category: 'promotions' });
+  assert.equal(p.action, 'llm');
+  assert.equal(p.priority, true);
+  assert.equal(r({ fromEmail: 'ana@mail.orientadora.com', subject: 'x' }).priority, true); // dominio e subdominio
+  assert.equal(r({ fromEmail: 'outro@puc-rio.br', subject: 'x' }).priority, undefined);
+  assert.equal(r({ fromEmail: 'avisovagas@catho.com.br', subject: 'Trabalhe em Rio de Janeiro: 1 nova vaga' }).rule, 'Remetente silenciado');
+  assert.equal(r({ fromEmail: 'jira@lab.atlassian.net', subject: '[JIRA] Review' }).action, 'discard');
+  assert.equal(r({ fromEmail: 'jira@outro.atlassian.net', subject: '[JIRA] Review' }).action, 'llm');
+  // processo seletivo continua na frente das listas
+  assert.equal(r({ fromEmail: 'x@catho.com.br', subject: 'Entrevista', labels: ['Processos seletivos'] }).action, 'mandatory');
+  // marketing de plataforma de vaga
+  assert.equal(r({ fromEmail: 'no-reply@gupy.com.br', subject: 'Marcelo, que tal destacar seu currículo para novas vagas?' }).action, 'discard');
+  // lista no arquivo privado (variavel global) quando nao ha propriedade
+  const g = load();
+  g.LISTA_PRIORITARIA = ['prof@puc-rio.br'];
+  assert.equal(g.applyRules_({ fromEmail: 'prof@puc-rio.br', subject: 'x', labels: [], category: '' }).priority, true);
+});
+
+test('remetente prioritario chega na IA com a dica; o conteudo decide', () => {
+  const c = scenario({ MODE: 'live', PRIORITY_SENDERS: 'notas@puc-rio.br' }, goodGroq);
+  c.runAgentOnce_({});
+  const groqReq = c.__calls.fetch.find((f) => f.url.includes('groq.com')).body;
+  const sent = JSON.parse(groqReq.messages[1].content.split('\n').slice(2).join('\n'));
+  assert.ok(sent.find((i) => i.id === 'm3').dicas.some((h) => /prioritario/.test(h)));
+  assert.ok(!sent.find((i) => i.id === 'm2').dicas.some((h) => /prioritario/.test(h)));
+});
+
+test('Groq 429: espera o retry-after e tenta de novo uma vez', () => {
+  let n = 0;
+  const c = load({
+    props: { GROQ_API_KEY: 'k' },
+    fetch: () => (++n === 1
+      ? { code: 429, body: 'rate limit', headers: { 'retry-after': '2' } }
+      : { code: 200, body: JSON.stringify({ choices: [{ message: { content: '{"decisions":[]}' } }] }) })
+  });
+  const res = c.callGroq_('openai/gpt-oss-120b', 'oi', true);
+  assert.equal(res.ok, true);
+  assert.equal(n, 2);
+});
+
+test('simulateSenders: testa so os remetentes pedidos, nao mexe em nada e continua de onde parou', () => {
+  const now = Date.now();
+  const groq = (req) => {
+    const items = JSON.parse(req.messages[1].content.split('\n').slice(2).join('\n'));
+    const decisions = items.map((it) => ({ id: it.id, notify: /cancelada/.test(it.assunto), category: 'academico',
+      summary: 'ENG4040: aula cancelada', deadline: '', reason: 'so material' }));
+    return { code: 200, body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ decisions }) } }] }) };
+  };
+  const c = load({
+    props: Object.assign({}, BASE_PROPS, { SIM_SENDERS: 'autosau@puc-rio.br', PRIORITY_SENDERS: 'autosau@puc-rio.br' }),
+    threads: [
+      { id: 't1', messages: [{ id: 'a1', from: 'Avisos <autosau@puc-rio.br>', subject: 'Aula cancelada', date: now - 86400000 }] },
+      { id: 't2', messages: [{ id: 'a2', from: 'Avisos <autosau@puc-rio.br>', subject: 'Exercícios de revisão', date: now - 2 * 86400000 },
+        { id: 'a3', from: 'Marcelo <marcelo@example.com>', subject: 'Re: Exercícios de revisão', date: now - 86400000 }] },
+      { id: 't3', messages: [{ id: 'q1', from: 'Quora <digest@quora.com>', subject: 'Top', date: now - 86400000 }] }
+    ],
+    fetch: (url, params) => (url.includes('groq.com') ? groq(JSON.parse(params.payload)) : { code: 500, body: 'nao devia chamar' })
+  });
+  c.simulateSenders();
+  const rows = c.__calls.rows['Teste remetentes'];
+  assert.deepEqual(rows.slice(1).map((r) => [r[1], r[6]]).sort(), [['a1', 'AVISA'], ['a2', 'quieto']]);
+  assert.equal(c.__calls.fetch.filter((f) => !f.url.includes('groq.com')).length, 0); // nada enviado
+  assert.equal(c.__calls.emails.length, 0);
+  assert.deepEqual(c.__threads.map((t) => t.labels.length), [0, 0, 0]); // nada marcado
+  assert.equal(c.__props.store.PROCESSED_IDS, undefined);
+  const groqCalls = c.__calls.fetch.length;
+  c.simulateSenders(); // segunda rodada: tudo ja testado
+  assert.equal(c.__calls.fetch.length, groqCalls);
+  assert.equal(rows.length, 3);
+});

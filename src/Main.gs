@@ -55,6 +55,7 @@ function runAgentOnce_(opts) {
     it.action = r.action;
     it.rule = r.rule;
     it.mandatory = r.action === 'mandatory';
+    it.priority = !!r.priority;
   });
 
   // Camada 3 (obrigatorios primeiro: so precisam de resumo)

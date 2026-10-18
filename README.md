@@ -52,7 +52,8 @@ flowchart LR
 | `src/Webhook.gs` | Recebe da Meta os status de entrega e os comandos |
 | `src/Store.gs` | IDs já processados, estatísticas e planilha de log |
 | `src/Digest.gs` | Resumo diário |
-| `src/Setup.gs` | `setup()`, testes e simulação |
+| `src/Setup.gs` | `setup()`, testes, simulação e levantamento de remetentes |
+| `Listas.gs` (privado) | Suas listas de remetentes prioritários e silenciados; modelo em `docs/Listas.example.gs` |
 | `src/Config.gs` | Configuração; segredos ficam fora do código |
 | `src/Text.gs` | Funções puras de texto (limpeza, máscara de números) |
 | `test/` | Testes locais com Node simulando Gmail, Groq e Meta |
@@ -127,6 +128,19 @@ Crie o filtro descrito em [docs/gmail-filter.txt](docs/gmail-filter.txt), trocan
 5. Rode `testWhatsApp`. Com a Meta, `ok` significa que ela aceitou; confirme que chegou no celular. Se não chegar, rode `showStatus` depois de 1 minuto (precisa do webhook).
 6. Rode `dryRunLast24h`: o agente simula as últimas 24h sem enviar nada e grava as decisões na aba **Simulacao** da planilha "Agente de Emails - Log" (no seu Drive). Ajuste `src/Rules.gs` ou o prompt em `src/Classifier.gs` se discordar de algo.
 7. Rode `setup`. Ele cria os gatilhos (a cada 10 min e o resumo das 8h), a planilha e o marcador `Agente/Avisado`.
+
+### Opcional: listas de remetentes
+
+Algumas pessoas e sistemas importam mais que outros, mas nem tudo o que eles mandam merece aviso. Um professor que posta "exercícios de revisão" não deve tocar o celular; o mesmo professor cancelando a aula de amanhã deve.
+
+1. Rode `senderReport`. Ele levanta os remetentes dos últimos 120 dias (fora Promoções/Social/Fóruns) e grava na aba **Remetentes**: quantos e-mails cada um mandou, quantos você abriu, quantos o Gmail marcou como importantes e em quantos você respondeu.
+2. No editor do Apps Script, crie um arquivo `Listas` com o conteúdo de [docs/Listas.example.gs](docs/Listas.example.gs) e preencha:
+   - `LISTA_PRIORITARIA`: sempre passam pela IA (nenhuma regra de descarte os corta) com a dica de remetente importante. **Quem decide se avisa continua sendo o conteúdo.**
+   - `LISTA_SILENCIADA`: descartados direto, sem gastar IA (muito volume, você nunca abre).
+   - `LISTA_TESTE`: remetentes para o teste do passo 3.
+
+   Esse arquivo tem e-mails de pessoas reais, por isso fica só no Apps Script e não vai para o repositório (`private/` está no `.gitignore`).
+3. Rode `simulateSenders`. Ele passa pela IA os e-mails reais desses remetentes (até 40 conversas de cada), sem avisar nem marcar nada, e grava na aba **Teste remetentes** o que teria avisado e por quê. Se o tempo de 6 min acabar, rode de novo: ele continua de onde parou. Para refazer depois de mudar o prompt, apague a aba.
 
 ### 5. Webhook (só para a Meta)
 
