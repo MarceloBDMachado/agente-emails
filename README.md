@@ -94,7 +94,7 @@ Cada aviso vira uma mensagem curta (assunto = resumo da IA, corpo com remetente,
 
 1. No editor do Apps Script, em **Serviços > +**, adicione a **Gmail API** (o Google pede para aceitar os termos de uso das APIs).
 2. Em **Propriedades do script**, defina `WA_PROVIDER` = `gmail`. Não precisa de `WA_TO` nem de token.
-3. Rode `testWhatsApp`: o marcador `Avisos` é criado com uma mensagem de teste.
+3. Abra o arquivo `GmailAlert.gs` no editor e rode `testGmailAlert`: o marcador `Avisos` é criado com uma mensagem de teste.
 4. No app do Gmail do celular: **Configurações > sua conta**. Desligue **Notificações da caixa de entrada**. Em **Gerenciar marcadores > Avisos**, sincronize os últimos 30 dias e ligue **Notificações do marcador** e **Notificar sobre todas as mensagens**.
 
 > Por que não WhatsApp no seu próprio número? Mensagens que você manda para você mesmo nunca notificam no WhatsApp, e serviços como TextMeBot enviam *como* você (dispositivo conectado). Para tocar, o remetente precisa ser outro número: Meta (opção A) ou um segundo chip (opção B).
@@ -185,7 +185,9 @@ Depois de alguns dias em `shadow`, confira a aba **Log** da planilha. Se as deci
 | Template rejeitado como Marketing | Use o corpo com três variáveis do passo 3A.4. |
 | `Falta a propriedade do script "X"` | Adicione a propriedade em Configurações do projeto. |
 | Canal Gmail: `Gmail HTTP 403` *"Gmail API has not been used in project"* | Adicione a Gmail API em Serviços (passo 3). |
-| Canal Gmail: a mensagem aparece em `Avisos`, mas o celular não toca | No app do Gmail, confira as notificações do marcador `Avisos` e se a sincronização dele está ligada. |
+| Canal Gmail: a mensagem aparece em `Avisos`, mas o celular não mostra nada | No app do Gmail, confira as notificações do marcador `Avisos` e se a sincronização dele está ligada. |
+| Canal Gmail: o aviso chega só na barra, sem som | Celular no Modo Silencioso: o Android cala todas as notificações. Para só os avisos tocarem, use o Não perturbe com exceção para o Gmail. Confira também o som da categoria de notificação do Gmail (segure o dedo no aviso > Mais). |
+| Dois testes seguidos não notificam | O Gmail agrupa mensagens de mesmo assunto numa conversa; se ela já foi aberta, a nova chega lida. Use `testGmailAlert` (põe o horário no assunto). |
 | WhatsApp chega mas não toca (TextMeBot e parecidos) | Mensagem para o próprio número nunca notifica. Use o canal Gmail ou um remetente diferente. |
 | Groq `429` *tokens per minute* | Plano gratuito: 8000 tokens/min no `gpt-oss-120b`, o que dá cerca de 1 lote de 8 e-mails por minuto. O agente espera o tempo pedido e tenta de novo. |
 
