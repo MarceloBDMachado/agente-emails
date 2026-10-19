@@ -114,3 +114,10 @@ function mimeWord_(s, isName) {
   if (!/^[\x20-\x7e]*$/.test(s)) return '=?UTF-8?B?' + Utilities.base64Encode(s, Utilities.Charset.UTF_8) + '?=';
   return isName ? '"' + s.replace(/["\\]/g, '') + '"' : s;
 }
+
+/** Manda um aviso de teste pelo canal Gmail (rode pelo editor; e a unica funcao publica deste arquivo). */
+function testGmailAlert() {
+  var hhmm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
+  var res = gmailNotify_({ fromName: 'Agente de Emails', summary: 'Teste das ' + hhmm + ': se tocou com som, esta tudo certo', deadline: '', category: 'outro' });
+  console.log(JSON.stringify(res));
+}
